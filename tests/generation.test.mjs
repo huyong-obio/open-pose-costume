@@ -29,7 +29,7 @@ const references = ['pose', 'costume'].map((kind) => ({
   },
 }));
 
-test('OpenWego remains the default and requires an API key', () => {
+test('defaults require an API key and custom providers are detected from base URL', () => {
   assert.equal(api.defaultImageConfig.baseUrl, 'https://openwego.com');
   assert.equal(api.defaultImageConfig.model, 'open-image-v2');
   assert.equal(api.defaultImageConfig.rememberKey, true);
@@ -61,8 +61,10 @@ test('OpenWego remains the default and requires an API key', () => {
       baseUrl: 'https://images.example/v1',
       apiKey: 'compatible-key',
     }),
-    'atomflow',
+    'custom',
   );
+  assert.deepEqual(api.applyImagePreset(api.defaultImageConfig, 'atomflow').baseUrl, 'https://atomflow.vip');
+  assert.equal(api.applyImagePreset(api.defaultImageConfig, 'atomflow').model, 'gpt-image-2.6-sunburst');
 });
 
 test('endpoint normalization accepts compatible bases and rejects credential-bearing URLs', () => {
@@ -100,19 +102,29 @@ test('keys are remembered by default, while session-only storage and clearing re
     api.saveImageConfig(config);
     assert.ok(!localStorage.getItem('opc-image-settings').includes(config.apiKey));
     assert.equal(api.loadImageConfig().apiKey, config.apiKey);
-    sessionStorage.removeItem('opc-image-session-key-atomflow');
+    sessionStorage.removeItem('opc-image-session-key');
     assert.equal(api.loadImageConfig().apiKey, '');
     assert.equal(api.loadImageConfig().baseUrl, config.baseUrl);
     api.saveImageConfig({ ...config, rememberKey: true });
     assert.equal(api.loadImageConfig().apiKey, config.apiKey);
     localStorage.setItem(
       'opc-image-settings',
-      JSON.stringify({ ...config, rememberKey: true, model: 'grok-imagine-image-2.0' }),
+      JSON.stringify({
+        ...config,
+        baseUrl: 'https://atomflow.vip',
+        rememberKey: true,
+        model: 'grok-imagine-image-2.0',
+      }),
     );
     assert.equal(api.loadImageConfig().model, 'gpt-image-2.6-sunburst');
     localStorage.setItem(
       'opc-image-settings',
-      JSON.stringify({ ...config, rememberKey: true, model: 'gpt-image-2' }),
+      JSON.stringify({
+        ...config,
+        baseUrl: 'https://atomflow.vip',
+        rememberKey: true,
+        model: 'gpt-image-2',
+      }),
     );
     assert.equal(api.loadImageConfig().model, 'gpt-image-2.6-sunburst');
     assert.equal(api.loadImageConfig().apiKey, config.apiKey);
@@ -129,7 +141,7 @@ test('keys are remembered by default, while session-only storage and clearing re
   }
 });
 
-test('OpenWego and Atomflow retain separate keys and settings while switching', () => {
+test('custom provider settings replace the previous dual-service storage model', () => {
   const storage = () => {
     const values = new Map();
     return {
@@ -141,37 +153,43 @@ test('OpenWego and Atomflow retain separate keys and settings while switching', 
   globalThis.localStorage = storage();
   globalThis.sessionStorage = storage();
   try {
-    const openwego = {
+    const custom = {
       ...api.defaultImageConfig,
-      apiKey: 'openwego-key',
-      model: 'open-image-custom',
-      rememberKey: true,
-    };
-    const atomflow = {
-      ...api.defaultImageConfig,
-      ...api.imageServicePresets.atomflow,
       baseUrl: 'https://images.example/v1',
-      apiKey: 'atomflow-key',
+      apiKey: 'custom-key',
       model: 'custom-image-model',
       rememberKey: false,
     };
-    api.saveImageConfig(openwego);
-    api.saveImageConfig(atomflow);
-    let state = api.loadImageConfigState();
-    assert.equal(state.activeService, 'atomflow');
-    assert.equal(state.configs.openwego.apiKey, 'openwego-key');
-    assert.equal(state.configs.openwego.model, 'open-image-custom');
-    assert.equal(state.configs.atomflow.apiKey, 'atomflow-key');
-    assert.equal(state.configs.atomflow.baseUrl, 'https://images.example/v1');
-    assert.ok(!localStorage.getItem('opc-image-settings').includes('atomflow-key'));
-    assert.equal(sessionStorage.getItem('opc-image-session-key-atomflow'), 'atomflow-key');
+    api.saveImageConfig(custom);
+    const loaded = api.loadImageConfig();
+    assert.equal(loaded.baseUrl, 'https://images.example/v1');
+    assert.equal(loaded.apiKey, 'custom-key');
+    assert.equal(loaded.model, 'custom-image-model');
+    assert.equal(api.imageServiceForConfig(loaded), 'custom');
+    assert.ok(!localStorage.getItem('opc-image-settings').includes('custom-key'));
+    assert.equal(sessionStorage.getItem('opc-image-session-key'), 'custom-key');
+    assert.match(localStorage.getItem('opc-image-settings'), /"version":3/);
 
-    api.saveImageConfig(state.configs.openwego);
-    state = api.loadImageConfigState();
-    assert.equal(state.activeService, 'openwego');
-    assert.equal(state.configs.openwego.apiKey, 'openwego-key');
-    assert.equal(state.configs.atomflow.apiKey, 'atomflow-key');
-    assert.equal(state.configs.atomflow.model, 'custom-image-model');
+    localStorage.setItem(
+      'opc-image-settings',
+      JSON.stringify({
+        version: 2,
+        activeService: 'atomflow',
+        services: {
+          openwego: { ...api.defaultImageConfig, apiKey: 'openwego-key', rememberKey: true },
+          atomflow: {
+            ...api.defaultImageConfig,
+            ...api.imageServicePresets.atomflow,
+            apiKey: 'legacy-atomflow-key',
+            rememberKey: true,
+          },
+        },
+      }),
+    );
+    const migrated = api.loadImageConfig();
+    assert.equal(migrated.baseUrl, 'https://atomflow.vip');
+    assert.equal(migrated.apiKey, 'legacy-atomflow-key');
+    assert.equal(migrated.model, 'gpt-image-2.6-sunburst');
   } finally {
     delete globalThis.localStorage;
     delete globalThis.sessionStorage;

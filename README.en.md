@@ -118,6 +118,17 @@ npm run build
 
 Deploy `dist/` to any static host. The production site is [omilic.com](https://omilic.com/), with GitHub Pages retained as a fallback.
 
+### Intranet Docker (Ubuntu)
+
+- First deploy: [`docs/FIRST-DEPLOY.md`](docs/FIRST-DEPLOY.md)
+- Ops manual: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+```sh
+cp .env.example .env
+bash deploy/install.sh
+# open http://<server-ip>:5200/
+```
+
 The production Atomflow proxy lives in `worker/`. It accepts only allowed site origins, forwards fixed Atomflow image-edit endpoints, and stores neither keys nor images:
 
 ```sh

@@ -13,11 +13,9 @@ export interface ImageConfig {
   quality: 'auto' | 'low' | 'medium' | 'high';
   rememberKey: boolean;
 }
-export type ImageService = 'openwego' | 'atomflow';
-export interface ImageConfigState {
-  activeService: ImageService;
-  configs: Record<ImageService, ImageConfig>;
-}
+/** Detected from baseUrl for a few provider-specific request quirks. */
+export type ImageService = 'openwego' | 'custom';
+export type ImagePreset = 'openwego' | 'atomflow';
 interface ReferenceDetails {
   title: Reference['title'];
   keywords: Reference['keywords'];
@@ -45,27 +43,24 @@ export interface GenerationJob {
 
 const SETTINGS_KEY = 'opc-image-settings';
 const SESSION_KEY = 'opc-image-session-key';
-const SESSION_KEYS: Record<ImageService, string> = {
-  openwego: 'opc-image-session-key-openwego',
-  atomflow: 'opc-image-session-key-atomflow',
-};
+const LEGACY_SESSION_KEYS = [
+  'opc-image-session-key-openwego',
+  'opc-image-session-key-atomflow',
+] as const;
 export const imageServicePresets = {
   openwego: {
     baseUrl: 'https://openwego.com',
     model: 'open-image-v2',
     size: '1024x1536',
-    quality: 'auto',
+    quality: 'auto' as const,
   },
   atomflow: {
     baseUrl: 'https://atomflow.vip',
     model: 'gpt-image-2.6-sunburst',
     size: '1024x1536',
-    quality: 'auto',
+    quality: 'auto' as const,
   },
-} as const satisfies Record<
-  ImageService,
-  Pick<ImageConfig, 'baseUrl' | 'model' | 'size' | 'quality'>
->;
+} satisfies Record<ImagePreset, Pick<ImageConfig, 'baseUrl' | 'model' | 'size' | 'quality'>>;
 export const defaultImageConfig: ImageConfig = {
   ...imageServicePresets.openwego,
   apiKey: '',
@@ -73,14 +68,6 @@ export const defaultImageConfig: ImageConfig = {
 };
 export const imageSizes = ['1024x1024', '1024x1536', '1536x1024', '2048x2048', 'auto'];
 export const openWegoImageSizes = ['1024x1024', '1024x1536', '1536x1024'];
-
-function defaultConfigForService(service: ImageService): ImageConfig {
-  return {
-    ...defaultImageConfig,
-    ...imageServicePresets[service],
-    apiKey: '',
-  };
-}
 
 export function imageEndpoint(baseUrl: string): string {
   const url = new URL(baseUrl.trim());
@@ -120,9 +107,9 @@ export function imageServiceForConfig(config: ImageConfig): ImageService {
   try {
     const endpoint = imageEndpoint(config.baseUrl);
     if (endpoint === 'https://openwego.com/v1/images/edits') return 'openwego';
-    return 'atomflow';
+    return 'custom';
   } catch {
-    return 'atomflow';
+    return 'custom';
   }
 }
 
@@ -139,127 +126,107 @@ export function imageSizesForConfig(config: ImageConfig): string[] {
   return imageServiceForConfig(config) === 'openwego' ? openWegoImageSizes : imageSizes;
 }
 
-function configFromStorage(
-  service: ImageService,
+export function applyImagePreset(config: ImageConfig, preset: ImagePreset): ImageConfig {
+  return {
+    ...config,
+    ...imageServicePresets[preset],
+  };
+}
+
+function migrateLegacyModel(baseUrl: string, model: string): string {
+  try {
+    const endpoint = imageEndpoint(baseUrl);
+    if (
+      (endpoint === 'https://atomflow.vip/v1/images/edits' ||
+        endpoint === 'https://api.atomflow.vip/v1/images/edits') &&
+      (model === 'gpt-image-2' || model.startsWith('grok-'))
+    )
+      return imageServicePresets.atomflow.model;
+  } catch {
+    /* Keep the stored model when the URL itself is invalid. */
+  }
+  return model;
+}
+
+function configFromSaved(
   saved: Partial<ImageConfig> | null | undefined,
-  legacySessionKey = '',
+  sessionKey = '',
 ): ImageConfig {
-  const fallback = defaultConfigForService(service);
   if (!saved || typeof saved.baseUrl !== 'string' || typeof saved.model !== 'string')
-    return fallback;
+    return { ...defaultImageConfig };
   try {
     const rememberKey = saved.rememberKey === true;
-    const storedKey = rememberKey
-      ? saved.apiKey
-      : sessionStorage.getItem(SESSION_KEYS[service]) || legacySessionKey;
-    const model =
-      service === 'atomflow' && (saved.model === 'gpt-image-2' || saved.model.startsWith('grok-'))
-        ? imageServicePresets.atomflow.model
-        : saved.model;
+    const storedKey = rememberKey ? saved.apiKey : sessionKey;
     const candidate: ImageConfig = {
-      ...fallback,
+      ...defaultImageConfig,
       ...saved,
-      model,
+      model: migrateLegacyModel(saved.baseUrl, saved.model),
       rememberKey,
       apiKey: typeof storedKey === 'string' ? storedKey : '',
     };
     normalizeImageConfig({ ...candidate, apiKey: candidate.apiKey || 'validation-only' });
     return candidate;
   } catch {
-    return fallback;
+    return { ...defaultImageConfig };
   }
 }
 
-export function loadImageConfigState(): ImageConfigState {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-    if (saved?.version === 2 && saved.services && typeof saved.services === 'object') {
-      const activeService: ImageService =
-        saved.activeService === 'atomflow' ? 'atomflow' : 'openwego';
-      return {
-        activeService,
-        configs: {
-          openwego: configFromStorage('openwego', saved.services.openwego),
-          atomflow: configFromStorage('atomflow', saved.services.atomflow),
-        },
-      };
-    }
-    if (!saved || typeof saved.baseUrl !== 'string' || typeof saved.model !== 'string') {
-      return {
-        activeService: 'openwego',
-        configs: {
-          openwego: defaultConfigForService('openwego'),
-          atomflow: defaultConfigForService('atomflow'),
-        },
-      };
-    }
-    const activeService = imageServiceForConfig({ ...defaultImageConfig, ...saved });
-    const legacySessionKey = sessionStorage.getItem(SESSION_KEY) || '';
-    const configs = {
-      openwego: defaultConfigForService('openwego'),
-      atomflow: defaultConfigForService('atomflow'),
-    };
-    configs[activeService] = configFromStorage(activeService, saved, legacySessionKey);
-    return { activeService, configs };
-  } catch {
-    return {
-      activeService: 'openwego',
-      configs: {
-        openwego: defaultConfigForService('openwego'),
-        atomflow: defaultConfigForService('atomflow'),
-      },
-    };
-  }
+function legacySessionKey(): string {
+  return (
+    sessionStorage.getItem(SESSION_KEY) ||
+    LEGACY_SESSION_KEYS.map((key) => sessionStorage.getItem(key)).find(Boolean) ||
+    ''
+  );
 }
 
 export function loadImageConfig(): ImageConfig {
-  const state = loadImageConfigState();
-  return state.configs[state.activeService];
-}
-
-export function saveImageConfigState(
-  configs: Record<ImageService, ImageConfig>,
-  activeService: ImageService,
-): ImageConfig {
-  normalizeImageConfig(configs[activeService]);
-  const normalized = Object.fromEntries(
-    (['openwego', 'atomflow'] as const).map((service) => {
-      const apiKey = configs[service].apiKey.trim();
-      const valid = normalizeImageConfig({
-        ...configs[service],
-        apiKey: apiKey || 'validation-only',
-      });
-      return [service, { ...valid, apiKey }];
-    }),
-  ) as Record<ImageService, ImageConfig>;
-  const services = Object.fromEntries(
-    (['openwego', 'atomflow'] as const).map((service) => {
-      const { apiKey, ...settings } = normalized[service];
-      return [service, { ...settings, ...(settings.rememberKey && apiKey ? { apiKey } : {}) }];
-    }),
-  );
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ version: 2, activeService, services }));
-  for (const service of ['openwego', 'atomflow'] as const) {
-    const config = normalized[service];
-    if (config.rememberKey || !config.apiKey) sessionStorage.removeItem(SESSION_KEYS[service]);
-    else sessionStorage.setItem(SESSION_KEYS[service], config.apiKey);
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (saved?.version === 2 && saved.services && typeof saved.services === 'object') {
+      const active =
+        saved.activeService === 'atomflow'
+          ? saved.services.atomflow
+          : saved.activeService === 'openwego'
+            ? saved.services.openwego
+            : saved.services.openwego || saved.services.atomflow;
+      const serviceKey =
+        saved.activeService === 'atomflow'
+          ? 'opc-image-session-key-atomflow'
+          : 'opc-image-session-key-openwego';
+      return configFromSaved(
+        active,
+        sessionStorage.getItem(serviceKey) || legacySessionKey(),
+      );
+    }
+    return configFromSaved(saved, legacySessionKey());
+  } catch {
+    return { ...defaultImageConfig };
   }
-  sessionStorage.removeItem(SESSION_KEY);
-  return normalized[activeService];
 }
 
 export function saveImageConfig(config: ImageConfig): ImageConfig {
-  const state = loadImageConfigState();
-  const activeService = imageServiceForConfig(config);
-  state.configs[activeService] = config;
-  return saveImageConfigState(state.configs, activeService);
+  const apiKey = config.apiKey.trim();
+  const valid = normalizeImageConfig({ ...config, apiKey: apiKey || 'validation-only' });
+  const normalized = { ...valid, apiKey };
+  const { apiKey: key, ...settings } = normalized;
+  localStorage.setItem(
+    SETTINGS_KEY,
+    JSON.stringify({
+      version: 3,
+      ...settings,
+      ...(settings.rememberKey && key ? { apiKey: key } : {}),
+    }),
+  );
+  if (settings.rememberKey || !key) sessionStorage.removeItem(SESSION_KEY);
+  else sessionStorage.setItem(SESSION_KEY, key);
+  for (const legacy of LEGACY_SESSION_KEYS) sessionStorage.removeItem(legacy);
+  return normalized;
 }
 
 export function clearImageConfig() {
   localStorage.removeItem(SETTINGS_KEY);
   sessionStorage.removeItem(SESSION_KEY);
-  sessionStorage.removeItem(SESSION_KEYS.openwego);
-  sessionStorage.removeItem(SESSION_KEYS.atomflow);
+  for (const legacy of LEGACY_SESSION_KEYS) sessionStorage.removeItem(legacy);
 }
 
 export function referencePrompt(references: ImageReference[], lang: Lang): string {
@@ -440,7 +407,7 @@ export async function generateReferenceImage(
     form.set('prompt', prompt.trim());
     form.set('n', '1');
     form.set('size', valid.size);
-    if (imageServiceForConfig(valid) === 'atomflow') form.set('quality', valid.quality);
+    if (imageServiceForConfig(valid) !== 'openwego') form.set('quality', valid.quality);
     for (const [index, reference] of references.entries()) {
       combined.throwIfAborted();
       let blob: Blob;

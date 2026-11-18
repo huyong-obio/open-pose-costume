@@ -804,7 +804,7 @@ export function GenerationStudio({
                 </option>
               ))}
             </select>
-            {service === 'atomflow' && (
+            {service !== 'openwego' && (
               <>
                 <label className="studio-field-label" htmlFor="studio-quality">
                   {g.quality}

@@ -1,0 +1,38 @@
+# Open Pose & Costume —— 公司内网 Docker 部署
+#
+# 默认：
+#   docker compose up -d
+# 访问：
+#   http://<服务器IP>:5200
+#
+# 镜像名固定，便于「开发机构建 → docker save → 服务器 docker load」。
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_IMAGE_PROXY_URL: ${VITE_IMAGE_PROXY_URL:-}
+        VITE_IMAGE_JOB_API_URL: ${VITE_IMAGE_JOB_API_URL:-}
+    image: open-pose-costume-web:latest
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${OPC_BIND_IP:-0.0.0.0}:${OPC_PORT:-5200}:80"
+    mem_limit: 256m
+    cpus: 0.50
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

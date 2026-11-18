@@ -1,8 +1,9 @@
 export const generationCopy = {
   zh: {
     settings: '生图设置',
-    settingsIntro: '选择适合这次创作的生图方式。',
-    service: '生成方式',
+    settingsIntro: '填写兼容 OpenAI 图片编辑协议的服务地址、API Key 和模型名称。',
+    presets: '推荐预设',
+    presetsHint: '点击预设可自动填入地址与模型，仍可手动修改为任意兼容服务。',
     openWegoTitle: 'OpenWego 免费生成',
     openWegoTag: '免费',
     openWegoDescription: 'open-image-v2',
@@ -14,33 +15,21 @@ export const generationCopy = {
     atomflowDescription: 'gpt-image-2.6-sunburst',
     atomflowBenefit: '生图领域顶尖模型',
     atomflowCaveat: '安全审查严格',
-    atomflowCompatible: '支持自定义 URL、密钥和模型',
+    atomflowCompatible: '也可改成其他兼容服务',
     baseUrl: '服务地址',
-    atomflowBaseUrlHint:
-      '默认使用 Atomflow；也可填写其他服务的根地址或 /v1 地址，系统会请求 /v1/images/edits。',
+    baseUrlHint: '填写服务根地址或 /v1 地址；系统会请求 /v1/images/edits。',
     apiKey: 'API Key',
     apiKeyRequired: 'API Key（必填）',
-    openWegoKeyHint: '登录 OpenWego 获取 API Key；免充值，填写后可免费不限量使用。',
-    atomflowKeyHint: '需要所填服务对应的 API Key；密钥只会发送到该服务地址。',
-    getOpenWegoKey: '登录 / 获取 API Key',
-    getApiKey: '获取APIKey',
-    apiGuide: '获取步骤指引',
-    apiGuideTitle: '免费额度 API 获取步骤',
-    openWegoGuideTitle: 'OpenWego API Key 获取步骤',
-    openWegoGuideIntro: '登录 OpenWego 后复制个人 API Key，即可免费不限量使用。',
-    openWegoGuidePrivacy: '完整密钥属于私密信息，请勿分享；如需更换，可在 API 访问页面重置。',
-    openWegoToolsTitle: '不止免费生图',
-    openWegoToolsDescription:
-      'OpenWego 还有图片反推提示词、提示词优化、风格提取等免费工具，界面干净清爽、无广告。',
-    openWegoToolsAction: '浏览免费工具',
-    openWegoAccountAction: '登录并获取 API Key',
+    apiKeyHint: '填写所填服务对应的 API Key；密钥只会发送到该服务地址。',
+    apiGuide: '配置指引',
+    apiGuideTitle: '自定义生图服务配置',
+    openWegoAccountAction: '打开 OpenWego 获取密钥',
     apiGuideIntro:
-      'Atomflow 的 codex 分组支持 gpt-image-2.6-sunburst，新用户可获得 10 次生图试用额度；也可以填写任意兼容 OpenAI 图片编辑协议的服务。具体额度以服务当前规则为准。',
+      '任意兼容 OpenAI 图片编辑（/v1/images/edits）的服务都可使用。也可先点上方预设填入 OpenWego 或 Atomflow，再按需修改。',
     apiGuideDocs: '查看完整图文说明',
-    apiGuideOpenAtomflow: '打开 Atomflow',
     apiGuidePrivacy: '密钥只用于发起你的生图请求；未勾选记住密钥时，仅保留在当前浏览器会话。',
-    model: '模型',
-    modelHint: '已填入推荐模型，也可以手动更换。',
+    model: '模型名称',
+    modelHint: '填写服务商提供的模型名，例如 open-image-v2 或 gpt-image-2.6-sunburst。',
     referenceCount: '提交参考图数量',
     size: '生成尺寸',
     quality: '质量',
@@ -51,10 +40,9 @@ export const generationCopy = {
     hideKey: '隐藏密钥',
     privacy:
       '配置仅保存在此浏览器。未勾选时，密钥只保留在当前会话。生成图片或上传服饰进行提取时，相应图片和描述会发送到此服务。',
-    openWegoUsage: '使用 OpenWego API Key 免费不限量生图，',
+    openWegoUsage: '当前使用 OpenWego API Key 免费不限量生图，',
     openWegoThanks: '特别感谢 OpenWego 大善人的免费 API。',
-    atomflowUsage:
-      '默认使用 Atomflow 高质量模型；自定义服务需支持浏览器跨域访问和 OpenAI 图片编辑格式。',
+    customUsage: '自定义服务需支持浏览器跨域访问，并兼容 OpenAI 图片编辑格式。',
     save: '保存配置',
     clear: '清除配置',
     saved: '生图配置已保存',
@@ -127,8 +115,9 @@ export const generationCopy = {
   },
   en: {
     settings: 'Image settings',
-    settingsIntro: 'Choose how you want to generate this image.',
-    service: 'Generation service',
+    settingsIntro: 'Enter an OpenAI image-edit compatible service URL, API key and model name.',
+    presets: 'Suggested presets',
+    presetsHint: 'Presets fill the URL and model. You can still edit them for any compatible service.',
     openWegoTitle: 'OpenWego free generation',
     openWegoTag: 'Free',
     openWegoDescription: 'open-image-v2',
@@ -140,38 +129,22 @@ export const generationCopy = {
     atomflowDescription: 'gpt-image-2.6-sunburst',
     atomflowBenefit: 'Leading image generation quality',
     atomflowCaveat: 'Strict safety review',
-    atomflowCompatible: 'Custom URL, key and model supported',
+    atomflowCompatible: 'Or switch to another compatible service',
     baseUrl: 'Service URL',
-    atomflowBaseUrlHint:
-      'Atomflow is the default. You can also enter another service root or /v1 URL; requests go to /v1/images/edits.',
+    baseUrlHint: 'Enter a service root or /v1 URL. Requests go to /v1/images/edits.',
     apiKey: 'API key',
     apiKeyRequired: 'API key (required)',
-    openWegoKeyHint:
-      'Sign in to OpenWego for an API key. No top-up is required, and use is free and unlimited.',
-    atomflowKeyHint:
-      'Use the API key for the service URL you enter. The key is sent only to that address.',
-    getOpenWegoKey: 'Sign in / get API key',
-    getApiKey: 'Get API key',
+    apiKeyHint: 'Use the API key for the service URL you enter. The key is sent only to that address.',
     apiGuide: 'Setup guide',
-    apiGuideTitle: 'Get a free-trial API key',
-    openWegoGuideTitle: 'Get an OpenWego API key',
-    openWegoGuideIntro:
-      'Sign in to OpenWego and copy your personal API key for unlimited free use.',
-    openWegoGuidePrivacy:
-      'Keep the full key private. You can reset it from API access whenever needed.',
-    openWegoToolsTitle: 'More than free image generation',
-    openWegoToolsDescription:
-      'OpenWego also provides free reverse prompting, prompt enhancement, style extraction and other tools in a clean, ad-free interface.',
-    openWegoToolsAction: 'Browse free tools',
-    openWegoAccountAction: 'Sign in and get API key',
+    apiGuideTitle: 'Configure a custom image service',
+    openWegoAccountAction: 'Open OpenWego for a key',
     apiGuideIntro:
-      'Atomflow supports gpt-image-2.6-sunburst in the codex group and currently offers 10 trial image generations to new users. You can also use another OpenAI image-edit compatible provider. Current provider terms apply.',
+      'Any OpenAI image-edit compatible service (/v1/images/edits) works. You can also start from the OpenWego or Atomflow presets and edit them.',
     apiGuideDocs: 'Open the full illustrated guide',
-    apiGuideOpenAtomflow: 'Open Atomflow',
     apiGuidePrivacy:
       'The key is used only for your generation requests. Unless you choose to remember it, it stays in this browser session only.',
-    model: 'Model',
-    modelHint: 'The recommended model is prefilled and can be changed.',
+    model: 'Model name',
+    modelHint: 'Enter the provider model name, such as open-image-v2 or gpt-image-2.6-sunburst.',
     referenceCount: 'Submitted references',
     size: 'Image size',
     quality: 'Quality',
@@ -182,10 +155,10 @@ export const generationCopy = {
     hideKey: 'Hide key',
     privacy:
       'Settings stay in this browser. Without this option, the key lasts for this session only. Generation and uploaded outfit extraction send the relevant images and instructions to this service.',
-    openWegoUsage: 'Use an OpenWego API key for free, unlimited image generation. ',
+    openWegoUsage: 'Using an OpenWego API key for free, unlimited image generation. ',
     openWegoThanks: 'Special thanks to OpenWego for the free API.',
-    atomflowUsage:
-      'Atomflow high quality is the default. Custom services must allow browser CORS and support the OpenAI image-edit format.',
+    customUsage:
+      'Custom services must allow browser CORS and support the OpenAI image-edit format.',
     save: 'Save settings',
     clear: 'Clear settings',
     saved: 'Image settings saved',
@@ -265,32 +238,18 @@ export const generationCopy = {
 };
 
 export const apiGuideSteps = {
-  openwego: {
+  custom: {
     zh: [
-      '登录 OpenWego，点击页面右上角的“账户”进入个人中心。',
-      '在个人中心左侧选择“API 访问”。',
-      '在“当前 API 密钥”右侧点击“复制”，回到这里粘贴并保存。推荐模型为 open-image-v2；需要更换密钥时可在该页面重置。',
+      '填写服务地址（Base URL）、API Key 和模型名称。也可先点上方预设自动填入。',
+      '若使用 OpenWego：登录后进入“账户 → API 访问”，复制密钥并保存。推荐模型 open-image-v2。',
+      '若使用 Atomflow：创建 codex 分组密钥，推荐模型 gpt-image-2.6-sunburst。',
+      '其他兼容服务请按服务商文档填写对应地址、密钥和模型。网站不会在服务器保存密钥。',
     ],
     en: [
-      'Sign in to OpenWego and open Account from the top-right navigation.',
-      'Choose API access in the account sidebar.',
-      'Copy the current API key, paste it here and save. The recommended model is open-image-v2; reset the key on that page when needed.',
-    ],
-  },
-  atomflow: {
-    zh: [
-      '进入“一键生图”，点击“配置生图服务”打开当前设置。',
-      '点击“获取 API Key”前往 Atomflow，注册并登录账号。',
-      '进入“控制台 → API 密钥”，创建密钥：填写任意名称，分组选择 codex，然后保存。',
-      '点击新建密钥旁的复制按钮，复制完整 API Key。',
-      '回到此处粘贴密钥。可按需勾选“在此浏览器记住密钥”，然后点击“保存配置”。网站不会在服务器保存密钥。',
-    ],
-    en: [
-      'Open One-click Generate and select Configure image service.',
-      'Select Get API key, then register or sign in to Atomflow.',
-      'Open Console → API Keys and create a key. Enter any name, choose the codex group, then save.',
-      'Use the copy button beside the new key to copy the full API key.',
-      'Paste the key here. Optionally remember it in this browser, then save. This website does not store the key on its server.',
+      'Enter the service URL (Base URL), API key and model name. Or start from a preset above.',
+      'For OpenWego: sign in, open Account → API access, copy the key and save. Recommended model: open-image-v2.',
+      'For Atomflow: create a key in the codex group. Recommended model: gpt-image-2.6-sunburst.',
+      'For other compatible services, follow their docs for URL, key and model. This site does not store keys on a server.',
     ],
   },
 };

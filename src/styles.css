@@ -2780,10 +2780,10 @@ dialog::backdrop {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-.image-settings-form .image-service-options > label {
+.image-settings-form .image-service-options > button {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-content: start;
   gap: 10px;
   min-height: 118px;
@@ -2791,29 +2791,32 @@ dialog::backdrop {
   border: 1px solid #dce2ee;
   border-radius: 6px;
   background: #fafbfd;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
     background 150ms ease;
 }
-.image-settings-form .image-service-options > label:hover {
+.image-settings-form .image-service-options > button:hover {
   border-color: #bdc8de;
 }
-.image-settings-form .image-service-options > label.selected {
+.image-settings-form .image-service-options > button.selected {
   border-color: #6178db;
   background: #f7f8ff;
   box-shadow: inset 0 0 0 1px #6178db;
 }
-.image-service-options input[type='radio'] {
-  width: 14px;
-  height: 14px;
-  margin: 8px 0 0;
-  accent-color: var(--blue);
-}
-.image-service-options > label:focus-within {
+.image-settings-form .image-service-options > button:focus-visible {
   outline: 2px solid #bdcaf6;
   outline-offset: 2px;
+}
+.image-preset-hint {
+  display: block;
+  margin-top: 8px;
+  color: #8995a8;
+  font-size: 10px;
+  line-height: 1.6;
 }
 .image-service-logo {
   display: block;
@@ -3669,7 +3672,7 @@ dialog::backdrop {
   .image-service-options {
     grid-template-columns: 1fr;
   }
-  .image-settings-form .image-service-options > label {
+  .image-settings-form .image-service-options > button {
     min-height: 0;
   }
   .image-settings-row {
