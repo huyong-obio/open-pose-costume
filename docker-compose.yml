@@ -24,6 +24,11 @@ services:
     image: open-pose-costume-web:latest
     environment:
       TZ: ${TZ:-Asia/Shanghai}
+      # 火山方舟同源代理上游；内网需要走网关时在这里改
+      ARK_UPSTREAM: ${ARK_UPSTREAM:-https://ark.cn-beijing.volces.com}
+      ARK_HOST: ${ARK_HOST:-ark.cn-beijing.volces.com}
+      # 只替换上面两个变量，避免破坏 nginx 的 $http_* 变量
+      NGINX_ENVSUBST_FILTER: "^ARK_(UPSTREAM|HOST)$"
     ports:
       - "${OPC_BIND_IP:-0.0.0.0}:${OPC_PORT:-5200}:80"
     mem_limit: 256m

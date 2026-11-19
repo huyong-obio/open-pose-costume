@@ -108,6 +108,8 @@ export const generationCopy = {
     accessDenied:
       '请求被拒绝（403）。请检查 API Key 的模型／分组权限及 IP 限制；若配置正确，请联系维护者检查代理来源限制或服务端拦截。',
     networkFailed: '暂时无法连接生图服务，请检查网络后重试；若持续失败，请联系网站维护者。',
+    proxyUnavailable:
+      '生图代理返回了网页错误（不是接口响应），浏览器又无法直连火山方舟。请确认服务器能访问 ark.cn-beijing.volces.com，并重新执行部署脚本（bash deploy/install.sh --no-cache）。',
     timedOut: '生成超过 10 分钟，请稍后重试。',
     invalidResult: '服务没有返回可用图片，请检查接口兼容性后重试。',
     cancelled: '已取消生成',
@@ -237,6 +239,8 @@ export const generationCopy = {
       'Request denied (403). Check your API key’s model/group permissions and IP restrictions. If correct, ask the maintainer to check proxy origin restrictions or server-side blocking.',
     networkFailed:
       'The image service is temporarily unreachable. Check your connection and retry; contact the site maintainer if it continues.',
+    proxyUnavailable:
+      'The image proxy answered with a web error page instead of an API response, and the browser cannot reach Volcengine Ark directly. Make sure the server can open ark.cn-beijing.volces.com, then redeploy with bash deploy/install.sh --no-cache.',
     timedOut: 'Generation exceeded 10 minutes. Please retry later.',
     invalidResult: 'No usable image was returned. Check API compatibility and retry.',
     cancelled: 'Generation cancelled',

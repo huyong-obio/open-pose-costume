@@ -2,7 +2,7 @@ import { readImageResponse } from './image-diagnostics';
 import type { Kind, Lang, Reference, Variant } from './types';
 import { isDepthVariant, poseDepthOrigin } from './pose-depth';
 import { isCustomAsset } from './custom-assets';
-import { imageRequestEndpoint, isVolcengineArkEndpoint } from './image-transport';
+import { imageRequestEndpoint, isVolcengineArkEndpoint, volcengineProxyPath } from './image-transport';
 import { generateWithJobApi } from './image-job-transport';
 
 export interface ImageConfig {
@@ -397,6 +397,22 @@ export function imageResult(payload: unknown): string {
   throw new ImageGenerationError('invalidResult');
 }
 
+/**
+ * nginx misconfiguration shows up as a local HTML error page (404/5xx), while
+ * Volcengine Ark always answers JSON — so an HTML body means the proxy is
+ * broken, not that Ark rejected the request.
+ */
+async function looksLikeProxyFailure(response: Response): Promise<boolean> {
+  if (response.status < 400) return false;
+  if (/json/i.test(response.headers.get('content-type') || '')) return false;
+  const head = await response
+    .clone()
+    .text()
+    .then((text) => text.slice(0, 300))
+    .catch(() => '');
+  return !head.trim() || /<!doctype html|<html|<head|nginx/i.test(head);
+}
+
 export async function generateReferenceImage(
   config: ImageConfig,
   references: ImageReference[],
@@ -502,24 +518,50 @@ export async function generateReferenceImage(
     if (service === 'volcengine' || isVolcengineArkEndpoint(rawEndpoint)) {
       const images = [];
       for (const blob of blobs) images.push(await blobToDataUri(blob));
-      response = await fetcher(endpoint, {
-        method: 'POST',
-        signal: combined,
-        credentials: 'omit',
-        redirect: 'error',
-        headers: {
-          Authorization: `Bearer ${valid.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: valid.model,
-          prompt: prompt.trim(),
-          image: images.length === 1 ? images[0] : images,
-          size: volcengineSize(valid.size),
-          response_format: 'b64_json',
-          watermark: false,
-        }),
+      const body = JSON.stringify({
+        model: valid.model,
+        prompt: prompt.trim(),
+        image: images.length === 1 ? images[0] : images,
+        size: volcengineSize(valid.size),
+        response_format: 'b64_json',
+        watermark: false,
       });
+      const proxy =
+        typeof location !== 'undefined' && /^https?:$/.test(location.protocol)
+          ? `${location.origin}${volcengineProxyPath()}`
+          : '';
+      const sendArk = (target: string) =>
+        fetcher(target, {
+          method: 'POST',
+          signal: combined,
+          credentials: 'omit',
+          redirect: 'error',
+          headers: {
+            Authorization: `Bearer ${valid.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body,
+        });
+      // Ark allows browser CORS, so go direct first; fall back to the
+      // same-origin nginx proxy if the site is behind a filter that blocks it.
+      response = await sendArk(endpoint).catch(async (error) => {
+        if (combined.aborted) throw error;
+        if (!proxy || proxy === endpoint) throw error;
+        return sendArk(proxy).catch((proxyError) => {
+          if (combined.aborted) throw proxyError;
+          throw new ImageGenerationError('proxyUnavailable');
+        });
+      });
+      if (
+        endpoint !== proxy &&
+        proxy &&
+        (await looksLikeProxyFailure(response))
+      ) {
+        response = await sendArk(proxy).catch((error) => {
+          if (combined.aborted) throw error;
+          throw new ImageGenerationError('proxyUnavailable');
+        });
+      }
     } else {
       const form = new FormData();
       form.set('model', valid.model);

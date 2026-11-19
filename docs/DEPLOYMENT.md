@@ -111,9 +111,10 @@ bash deploy/install.sh
 
 火山方舟注意：
 
-- **不要**在 Base URL 后再加 `/v1`
-- 模型请填控制台 **Model ID**（如 `doubao-seedream-5-0-flash-260915`），不要填展示名
-- Docker 部署会通过同源 `/opc-proxy/ark/...` 转发，并带上 `Authorization`，避免浏览器 CORS
+- **不要**在 Base URL 后再加 `/v1`（已自动纠正为 `/api/v3/images/generations`）
+- 模型请填控制台 **Model ID**（如 `doubao-seedream-5-0-flash-260915`），不要填 `Doubao-Seedream-5.0-flash` 这类展示名，也不要漏掉日期后缀
+- 火山方舟接口本身放行浏览器 CORS（会回显 Origin 并允许 `Authorization`），所以前端默认**直连** `https://ark.cn-beijing.volces.com`
+- 只有直连被内网网关拦截时，才退回同源 `/opc-proxy/ark/...` 代理；该代理只用于兜底，失败时返回 JSON（`proxy_unavailable`）而不是 nginx 的 HTML 错误页
 
 ---
 
@@ -124,5 +125,6 @@ bash deploy/install.sh
 | `port is already allocated` | 改 `.env` 的 `OPC_PORT`，再跑 `install.sh` |
 | 构建失败 / npm 超时 | 走离线：`build-offline.sh --gzip` + `install.sh --offline` |
 | 页面白屏 | `docker compose logs web`；确认 `dist` 构建成功 |
-| 生图 CORS 失败 | 供应商未放行当前站点 Origin；改用内网兼容网关，或在网关侧加 CORS |
+| 生图 CORS 失败 | 火山方舟本身允许 CORS；其他供应商不放行当前站点 Origin 时，改用内网兼容网关，或在网关侧加 CORS |
+| 生图报 500/502（HTML 错误页） | 是 nginx 代理而非模型问题：`docker compose logs --tail=100 web`，确认容器能解析并访问 `ark.cn-beijing.volces.com`；新版前端默认直连，代理只兜底 |
 | `exec format error` | 离线镜像架构与服务器不一致，在同架构机器重打镜像 |

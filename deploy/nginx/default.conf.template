@@ -15,29 +15,31 @@ server {
   location = /opc-proxy/ark/healthz {
     default_type application/json;
     add_header Cache-Control "no-store";
+    add_header X-Opc-Ark-Upstream "${ARK_UPSTREAM}";
     return 200 '{"ok":true,"proxy":"volcengine-ark"}\n';
   }
 
   # 同源火山方舟 Seedream 代理（必须写在 location / 之前）
   # 浏览器 → /opc-proxy/ark/api/v3/images/generations
-  # 上游   → https://ark.cn-beijing.volces.com/api/v3/images/generations
-  location /opc-proxy/ark/ {
+  # 上游   → ${ARK_UPSTREAM}/api/v3/images/generations
+  #
+  # 注意：这里刻意用「变量 + resolver」而不是写死域名。
+  # 写死域名时 nginx 在启动阶段就要解析 DNS，内网 DNS 不通会直接起不来；
+  # 变量形式则改为每次请求解析，站点始终可用。
+  location = /opc-proxy/ark/api/v3/images/generations {
     limit_except POST OPTIONS {
       deny all;
     }
 
-    # 127.0.0.11 = Docker 内置 DNS；再兜底公共 DNS
-    resolver 127.0.0.11 8.8.8.8 1.1.1.1 valid=300s ipv6=off;
-    resolver_timeout 10s;
-
-    rewrite ^/opc-proxy/ark/(.*)$ /$1 break;
-    # 变量形式的 proxy_pass 才会走上面的 resolver
-    set $ark_upstream https://ark.cn-beijing.volces.com;
-    proxy_pass $ark_upstream;
+    resolver 127.0.0.11 ipv6=off valid=30s;
+    set $ark_upstream ${ARK_UPSTREAM};
+    set $ark_host ${ARK_HOST};
+    proxy_pass $ark_upstream/api/v3/images/generations;
     proxy_http_version 1.1;
     proxy_ssl_server_name on;
-    proxy_ssl_name ark.cn-beijing.volces.com;
-    proxy_set_header Host ark.cn-beijing.volces.com;
+    proxy_ssl_name $ark_host;
+    proxy_ssl_verify off;
+    proxy_set_header Host $ark_host;
     proxy_set_header Authorization $http_authorization;
     proxy_set_header Content-Type $http_content_type;
     proxy_set_header Cookie "";
@@ -45,6 +47,16 @@ server {
     proxy_read_timeout 240s;
     proxy_send_timeout 240s;
     proxy_connect_timeout 30s;
+    proxy_buffering off;
+    # nginx 自身的 5xx 不要以 HTML 返回，前端据此判断“代理坏了”
+    error_page 502 503 504 = @ark_unavailable;
+  }
+
+  # 代理失败时返回 JSON，避免前端收到 nginx 的 HTML 错误页
+  location @ark_unavailable {
+    default_type application/json;
+    add_header Cache-Control "no-store";
+    return 502 '{"error":{"type":"proxy_unavailable","message":"cannot reach ${ARK_HOST} from the server; check DNS/network or call Ark directly"}}\n';
   }
 
   # 同源 Atomflow 图片编辑代理
@@ -55,6 +67,7 @@ server {
     proxy_pass https://atomflow.vip/v1/images/edits;
     proxy_http_version 1.1;
     proxy_ssl_server_name on;
+    proxy_ssl_verify off;
     proxy_set_header Host atomflow.vip;
     proxy_set_header Authorization $http_authorization;
     proxy_set_header Cookie "";
@@ -70,6 +83,7 @@ server {
     proxy_pass https://api.atomflow.vip/v1/images/edits;
     proxy_http_version 1.1;
     proxy_ssl_server_name on;
+    proxy_ssl_verify off;
     proxy_set_header Host api.atomflow.vip;
     proxy_set_header Authorization $http_authorization;
     proxy_set_header Cookie "";

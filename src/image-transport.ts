@@ -54,10 +54,10 @@ export function imageRequestEndpoint(
   }
 
   if (isVolcengineArkEndpoint(endpoint)) {
-    if (development) return volcengineProxyPath();
-    // Prefer same-origin nginx proxy in the browser to attach Authorization and avoid CORS.
-    if (typeof location !== 'undefined' && /^https?:$/.test(location.protocol))
-      return `${location.origin}${volcengineProxyPath()}`;
+    // Volcengine Ark answers CORS preflights (echoes Origin, allows
+    // Authorization), so the browser posts to it directly. The same-origin
+    // /opc-proxy/ark route stays available as a fallback only.
+    return endpoint;
   }
 
   return endpoint;

@@ -257,6 +257,22 @@ else
   warn "未检测到 /opc-proxy/ark/healthz。若生图报 404，请执行：bash deploy/install.sh --no-cache"
 fi
 
+# 上游连通性自检：浏览器直连是默认路径，服务器出不了公网时只能靠 nginx 代理
+ark_url="${ARK_UPSTREAM:-}"
+if [ -z "$ark_url" ] && [ -f "$REPO_ROOT/.env" ]; then
+  ark_url="$(sed -n 's/^ARK_UPSTREAM=//p' "$REPO_ROOT/.env" | tail -n 1)"
+fi
+ark_url="${ark_url:-https://ark.cn-beijing.volces.com}"
+ark_url="${ark_url%/}"
+if command -v curl >/dev/null 2>&1; then
+  ark_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$ark_url/" 2>/dev/null || true)"
+  if [ -z "$ark_code" ] || [ "$ark_code" = "000" ]; then
+    warn "服务器访问 $ark_url 失败（DNS 或出网受限）：浏览器直连能成功时不受影响，代理兜底会不可用"
+  else
+    ok "服务器可访问火山方舟（$ark_url → HTTP $ark_code，有响应即代表连通）"
+  fi
+fi
+
 # ---------------------------------------------------------------- 7. 汇总
 log "7/7 部署完成"
 "${COMPOSE[@]}" ps
@@ -274,3 +290,4 @@ printf '  %s logs -f --tail=200    查看日志\n' "${COMPOSE[*]}"
 printf '  %s restart               重启\n' "${COMPOSE[*]}"
 printf '  bash deploy/uninstall.sh 卸载容器（默认保留镜像）\n'
 printf '\n验证自定义供应商：打开生图设置，确认可填写服务地址、API Key、模型名称并保存。\n'
+printf '火山方舟的 Model 要填 Model ID（例如 doubao-seedream-5-0-flash-260915），不能填 Doubao-Seedream-5.0-flash 这类显示名。\n'
