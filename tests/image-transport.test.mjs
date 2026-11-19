@@ -31,6 +31,12 @@ test('only the two exact Atomflow edit endpoints use the development transport',
     assert.equal(imageRequestEndpoint(endpoint, true), endpoint);
 });
 
+test('Volcengine Ark generations use the same-origin development proxy', () => {
+  const endpoint = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
+  assert.equal(imageRequestEndpoint(endpoint, true), '/opc-proxy/ark/api/v3/images/generations');
+  assert.equal(imageRequestEndpoint(endpoint, false), endpoint);
+});
+
 test('production transport uses the configured proxy only for exact Atomflow endpoints', () => {
   const proxy = 'https://open-pose-costume-image-proxy.example.workers.dev';
   assert.equal(

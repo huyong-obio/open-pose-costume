@@ -98,16 +98,22 @@ bash deploy/install.sh
 
 设置页提供三个必填项：
 
-1. **服务地址（Base URL）** — 根地址或 `/v1`，最终请求 `/v1/images/edits`
+1. **服务地址（Base URL）**
 2. **API Key**
 3. **模型名称**
 
-OpenWego / Atomflow 仅作可选预设，用于自动填入推荐地址与模型；可随时改成任意兼容服务。
+可选预设：OpenWego / Atomflow / 火山方舟。
 
-自定义服务需：
+| 类型 | Base URL 示例 | 实际请求 |
+| --- | --- | --- |
+| OpenAI 兼容 | `https://api.example.com/v1` | `…/v1/images/edits`（multipart） |
+| 火山方舟 | `https://ark.cn-beijing.volces.com/api/v3` | `…/api/v3/images/generations`（JSON + Bearer） |
 
-- 兼容 OpenAI 图片编辑协议（`multipart` → `/v1/images/edits`）
-- 允许浏览器跨域（CORS），或由你方网关处理
+火山方舟注意：
+
+- **不要**在 Base URL 后再加 `/v1`
+- 模型请填控制台 **Model ID**（如 `doubao-seedream-5-0-flash-260915`），不要填展示名
+- Docker 部署会通过同源 `/opc-proxy/ark/...` 转发，并带上 `Authorization`，避免浏览器 CORS
 
 ---
 

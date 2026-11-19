@@ -2777,7 +2777,7 @@ dialog::backdrop {
 }
 .image-service-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .image-settings-form .image-service-options > button {
@@ -2827,6 +2827,15 @@ dialog::backdrop {
 }
 .image-service-logo.atomflow {
   border-radius: 0;
+}
+.image-service-logo.volcengine {
+  display: grid;
+  place-items: center;
+  background: #e8f3ff;
+  color: #1664ff;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 7px;
 }
 .image-service-copy {
   display: grid;
@@ -3666,6 +3675,11 @@ dialog::backdrop {
   }
   .generation-prompt > button {
     justify-self: end;
+  }
+}
+@media (max-width: 900px) {
+  .image-service-options {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 560px) {

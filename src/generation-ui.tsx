@@ -193,14 +193,11 @@ export function ImageSettings({
     setDraft((old) => applyImagePreset(old, preset));
     setError('');
   };
-  const activePreset =
-    draft.baseUrl.trim() === imageServicePresets.openwego.baseUrl &&
-    draft.model.trim() === imageServicePresets.openwego.model
-      ? 'openwego'
-      : draft.baseUrl.trim() === imageServicePresets.atomflow.baseUrl &&
-          draft.model.trim() === imageServicePresets.atomflow.model
-        ? 'atomflow'
-        : null;
+  const activePreset = (['openwego', 'atomflow', 'volcengine'] as const).find(
+    (preset) =>
+      draft.baseUrl.trim() === imageServicePresets[preset].baseUrl &&
+      draft.model.trim() === imageServicePresets[preset].model,
+  ) ?? null;
   return (
     <>
       <Modal onClose={onClose} label={t.settings} className="image-settings-modal">
@@ -275,6 +272,24 @@ export function ImageSettings({
                   <small>{t.atomflowCompatible}</small>
                 </span>
               </button>
+              <button
+                type="button"
+                className={activePreset === 'volcengine' ? 'selected' : ''}
+                onClick={() => applyPreset('volcengine')}
+              >
+                <span className="image-service-logo volcengine" aria-hidden="true">
+                  火
+                </span>
+                <span className="image-service-copy">
+                  <span>
+                    <strong>{t.volcengineTitle}</strong>
+                    <em>{t.volcengineTag}</em>
+                  </span>
+                  <small className="service-positive">{t.volcengineBenefit}</small>
+                  <small className="service-caveat">{t.volcengineCaveat}</small>
+                  <small>{t.volcengineCompatible}</small>
+                </span>
+              </button>
             </div>
             <small className="image-preset-hint">{t.presetsHint}</small>
           </fieldset>
@@ -285,7 +300,7 @@ export function ImageSettings({
               required
               autoComplete="off"
               spellCheck={false}
-              placeholder="https://api.example.com/v1"
+              placeholder="https://ark.cn-beijing.volces.com/api/v3"
               value={draft.baseUrl}
               onChange={(e) => update('baseUrl', e.target.value)}
             />
@@ -350,7 +365,9 @@ export function ImageSettings({
                 <small>{t.advancedSettingsHint}</small>
               </span>
             </summary>
-            <div className={`image-settings-row ${service === 'openwego' ? 'single' : ''}`}>
+            <div
+              className={`image-settings-row ${service === 'openwego' || service === 'volcengine' ? 'single' : ''}`}
+            >
               <label>
                 {t.size}
                 <select value={draft.size} onChange={(e) => update('size', e.target.value)}>
@@ -361,7 +378,7 @@ export function ImageSettings({
                   ))}
                 </select>
               </label>
-              {service !== 'openwego' && (
+              {service !== 'openwego' && service !== 'volcengine' && (
                 <label>
                   {t.quality}
                   <select value={draft.quality} onChange={(e) => update('quality', e.target.value)}>

@@ -41,6 +41,24 @@ export default defineConfig({
     proxy: {
       '^/__opc-image/site/v1/images/edits$': imageProxy('https://atomflow.vip'),
       '^/__opc-image/api/v1/images/edits$': imageProxy('https://api.atomflow.vip'),
+      '^/opc-proxy/ark/api/v3/images/generations$': {
+        target: 'https://ark.cn-beijing.volces.com',
+        changeOrigin: true,
+        secure: true,
+        followRedirects: false,
+        timeout: 240_000,
+        proxyTimeout: 240_000,
+        rewrite: () => '/api/v3/images/generations',
+        configure(proxy) {
+          proxy.on('proxyReq', (request) => {
+            request.removeHeader('cookie');
+            request.setHeader('Host', 'ark.cn-beijing.volces.com');
+          });
+          proxy.on('proxyRes', (response) => {
+            delete response.headers['set-cookie'];
+          });
+        },
+      },
     },
   },
 });

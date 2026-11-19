@@ -79,6 +79,24 @@ test('endpoint normalization accepts compatible bases and rejects credential-bea
     'http://127.0.0.1:6000/v1/images/edits',
   );
   for (const base of [
+    'https://ark.cn-beijing.volces.com/api/v3',
+    'https://ark.cn-beijing.volces.com/api/v3/',
+    'https://ark.cn-beijing.volces.com/api/v3/v1',
+    'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+  ])
+    assert.equal(
+      api.imageEndpoint(base),
+      'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+    );
+  assert.equal(
+    api.imageServiceForConfig({
+      ...api.defaultImageConfig,
+      ...api.imageServicePresets.volcengine,
+      apiKey: 'ark-key',
+    }),
+    'volcengine',
+  );
+  for (const base of [
     'http://images.example',
     'https://u:p@images.example',
     'https://images.example?key=value',
@@ -246,6 +264,41 @@ test('OpenWego requests require authorization and omit unsupported quality param
   assert.equal(request.options.body.get('model'), 'open-image-v2');
   assert.equal(request.options.body.get('quality'), null);
   assert.equal(request.options.body.get('size'), '1024x1536');
+});
+
+test('Volcengine Ark uses /api/v3/images/generations JSON with Bearer auth and reference data URIs', async () => {
+  const calls = [];
+  const arkConfig = {
+    ...api.defaultImageConfig,
+    ...api.imageServicePresets.volcengine,
+    apiKey: 'ark-test-key',
+    size: 'auto',
+  };
+  await api.generateReferenceImage(
+    arkConfig,
+    references,
+    'draw with seedream',
+    new AbortController().signal,
+    async (url, options) => {
+      calls.push({ url, options });
+      return calls.length <= 2
+        ? new Response(Buffer.from(png, 'base64'), { headers: { 'Content-Type': 'image/png' } })
+        : Response.json({ data: [{ b64_json: png }] });
+    },
+  );
+  const request = calls[2];
+  assert.equal(request.url, 'https://ark.cn-beijing.volces.com/api/v3/images/generations');
+  assert.equal(request.options.headers.Authorization, `Bearer ${arkConfig.apiKey}`);
+  assert.equal(request.options.headers['Content-Type'], 'application/json');
+  const body = JSON.parse(request.options.body);
+  assert.equal(body.model, arkConfig.model);
+  assert.equal(body.prompt, 'draw with seedream');
+  assert.equal(body.size, '2K');
+  assert.equal(body.response_format, 'b64_json');
+  assert.equal(body.watermark, false);
+  assert.ok(Array.isArray(body.image));
+  assert.equal(body.image.length, 2);
+  assert.match(body.image[0], /^data:image\/png;base64,/);
 });
 
 test('provider errors are redacted and not retried automatically', async () => {

@@ -804,7 +804,7 @@ export function GenerationStudio({
                 </option>
               ))}
             </select>
-            {service !== 'openwego' && (
+            {service !== 'openwego' && service !== 'volcengine' && (
               <>
                 <label className="studio-field-label" htmlFor="studio-quality">
                   {g.quality}

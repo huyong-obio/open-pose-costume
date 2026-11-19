@@ -2,7 +2,7 @@ import { readImageResponse } from './image-diagnostics';
 import type { Kind, Lang, Reference, Variant } from './types';
 import { isDepthVariant, poseDepthOrigin } from './pose-depth';
 import { isCustomAsset } from './custom-assets';
-import { imageRequestEndpoint } from './image-transport';
+import { imageRequestEndpoint, isVolcengineArkEndpoint } from './image-transport';
 import { generateWithJobApi } from './image-job-transport';
 
 export interface ImageConfig {
@@ -14,8 +14,8 @@ export interface ImageConfig {
   rememberKey: boolean;
 }
 /** Detected from baseUrl for a few provider-specific request quirks. */
-export type ImageService = 'openwego' | 'custom';
-export type ImagePreset = 'openwego' | 'atomflow';
+export type ImageService = 'openwego' | 'volcengine' | 'custom';
+export type ImagePreset = 'openwego' | 'atomflow' | 'volcengine';
 interface ReferenceDetails {
   title: Reference['title'];
   keywords: Reference['keywords'];
@@ -60,6 +60,12 @@ export const imageServicePresets = {
     size: '1024x1536',
     quality: 'auto' as const,
   },
+  volcengine: {
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    model: 'doubao-seedream-5-0-flash-260915',
+    size: '2048x2048',
+    quality: 'auto' as const,
+  },
 } satisfies Record<ImagePreset, Pick<ImageConfig, 'baseUrl' | 'model' | 'size' | 'quality'>>;
 export const defaultImageConfig: ImageConfig = {
   ...imageServicePresets.openwego,
@@ -68,6 +74,16 @@ export const defaultImageConfig: ImageConfig = {
 };
 export const imageSizes = ['1024x1024', '1024x1536', '1536x1024', '2048x2048', 'auto'];
 export const openWegoImageSizes = ['1024x1024', '1024x1536', '1536x1024'];
+export const volcengineImageSizes = ['1024x1024', '1024x1536', '1536x1024', '2048x2048', 'auto'];
+
+function isVolcengineHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === 'ark.cn-beijing.volces.com' ||
+    host.endsWith('.volces.com') ||
+    host.endsWith('.volcengineapi.com')
+  );
+}
 
 export function imageEndpoint(baseUrl: string): string {
   const url = new URL(baseUrl.trim());
@@ -80,7 +96,26 @@ export function imageEndpoint(baseUrl: string): string {
     url.hash
   )
     throw Error('invalidEndpoint');
-  let pathname = url.pathname.replace(/\/+$/, '').replace(/\/images\/(edits|generations)$/, '');
+  let pathname = url.pathname.replace(/\/+$/, '');
+  if (/\/images\/(edits|generations)$/.test(pathname)) return `${url.origin}${pathname}`;
+
+  // Volcengine Ark Seedream: POST /api/v3/images/generations (JSON, not OpenAI /v1/images/edits).
+  const arkLike =
+    isVolcengineHost(url.hostname) || /(^|\/)api\/v3(\/|$)/.test(pathname) || pathname === '/api/v3';
+  if (arkLike) {
+    pathname = pathname
+      .replace(/\/images\/(edits|generations)$/, '')
+      .replace(/\/v1$/, '')
+      .replace(/\/+$/, '');
+    if (!pathname.endsWith('/api/v3')) {
+      if (!pathname || pathname === '/') pathname = '/api/v3';
+      else if (pathname.endsWith('/api')) pathname += '/v3';
+      else pathname += '/api/v3';
+    }
+    return `${url.origin}${pathname}/images/generations`;
+  }
+
+  pathname = pathname.replace(/\/images\/(edits|generations)$/, '');
   if (!pathname.endsWith('/v1')) pathname += '/v1';
   return `${url.origin}${pathname}/images/edits`;
 }
@@ -97,7 +132,7 @@ export function normalizeImageConfig(config: ImageConfig): ImageConfig {
     throw Error('invalidConfig');
   return {
     ...config,
-    baseUrl: endpoint.replace(/\/images\/edits$/, ''),
+    baseUrl: endpoint.replace(/\/images\/(edits|generations)$/, ''),
     apiKey,
     model,
   };
@@ -107,6 +142,7 @@ export function imageServiceForConfig(config: ImageConfig): ImageService {
   try {
     const endpoint = imageEndpoint(config.baseUrl);
     if (endpoint === 'https://openwego.com/v1/images/edits') return 'openwego';
+    if (isVolcengineArkEndpoint(endpoint)) return 'volcengine';
     return 'custom';
   } catch {
     return 'custom';
@@ -123,7 +159,31 @@ export function imageConfigReady(config: ImageConfig): boolean {
 }
 
 export function imageSizesForConfig(config: ImageConfig): string[] {
-  return imageServiceForConfig(config) === 'openwego' ? openWegoImageSizes : imageSizes;
+  const service = imageServiceForConfig(config);
+  if (service === 'openwego') return openWegoImageSizes;
+  if (service === 'volcengine') return volcengineImageSizes;
+  return imageSizes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk)
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
+
+async function blobToDataUri(blob: Blob): Promise<string> {
+  const mime = blob.type || 'image/png';
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(mime))
+    throw new ImageGenerationError('referenceFailed');
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return `data:${mime};base64,${bytesToBase64(bytes)}`;
+}
+
+function volcengineSize(size: string): string {
+  return size === 'auto' ? '2K' : size;
 }
 
 export function applyImagePreset(config: ImageConfig, preset: ImagePreset): ImageConfig {
@@ -402,12 +462,8 @@ export async function generateReferenceImage(
           ? { data: [{ b64_json: jobResult.split(',', 2)[1] }] }
           : { data: [{ url: jobResult }] },
       );
-    const form = new FormData();
-    form.set('model', valid.model);
-    form.set('prompt', prompt.trim());
-    form.set('n', '1');
-    form.set('size', valid.size);
-    if (imageServiceForConfig(valid) !== 'openwego') form.set('quality', valid.quality);
+
+    const blobs: Blob[] = [];
     for (const [index, reference] of references.entries()) {
       combined.throwIfAborted();
       let blob: Blob;
@@ -431,26 +487,63 @@ export async function generateReferenceImage(
         blob.size > 50 * 1024 * 1024
       )
         throw new ImageGenerationError('referenceFailed');
-      form.append(
-        'image[]',
-        blob,
-        `${'file' in reference ? `${reference.kind}-upload` : reference.variant.id}.${blob.type === 'image/png' ? 'png' : blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`,
-      );
+      blobs.push(blob);
     }
+
     combined.throwIfAborted();
+    const rawEndpoint = imageEndpoint(valid.baseUrl);
     const endpoint = imageRequestEndpoint(
-      imageEndpoint(valid.baseUrl),
+      rawEndpoint,
       import.meta.env.DEV && !import.meta.env.SSR,
       import.meta.env.VITE_IMAGE_PROXY_URL,
     );
-    const response = await fetcher(endpoint, {
-      method: 'POST',
-      signal: combined,
-      credentials: 'omit',
-      redirect: 'error',
-      headers: { Authorization: `Bearer ${valid.apiKey}` },
-      body: form,
-    });
+    const service = imageServiceForConfig(valid);
+    let response: Response;
+    if (service === 'volcengine' || isVolcengineArkEndpoint(rawEndpoint)) {
+      const images = [];
+      for (const blob of blobs) images.push(await blobToDataUri(blob));
+      response = await fetcher(endpoint, {
+        method: 'POST',
+        signal: combined,
+        credentials: 'omit',
+        redirect: 'error',
+        headers: {
+          Authorization: `Bearer ${valid.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: valid.model,
+          prompt: prompt.trim(),
+          image: images.length === 1 ? images[0] : images,
+          size: volcengineSize(valid.size),
+          response_format: 'b64_json',
+          watermark: false,
+        }),
+      });
+    } else {
+      const form = new FormData();
+      form.set('model', valid.model);
+      form.set('prompt', prompt.trim());
+      form.set('n', '1');
+      form.set('size', valid.size);
+      if (service !== 'openwego') form.set('quality', valid.quality);
+      for (const [index, blob] of blobs.entries()) {
+        const reference = references[index]!;
+        form.append(
+          'image[]',
+          blob,
+          `${'file' in reference ? `${reference.kind}-upload` : reference.variant.id}.${blob.type === 'image/png' ? 'png' : blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`,
+        );
+      }
+      response = await fetcher(endpoint, {
+        method: 'POST',
+        signal: combined,
+        credentials: 'omit',
+        redirect: 'error',
+        headers: { Authorization: `Bearer ${valid.apiKey}` },
+        body: form,
+      });
+    }
     const { payload, diagnostic } = await readImageResponse(
       response,
       'provider-request',
@@ -464,7 +557,9 @@ export async function generateReferenceImage(
           ? 'safetyReviewFailed'
           : response.status === 403
             ? 'accessDenied'
-            : 'providerFailed',
+            : response.status === 401
+              ? 'providerFailed'
+              : 'providerFailed',
         diagnostic ||
           `HTTP ${response.status}${message ? ` · ${safeMessage(message, valid.apiKey)}` : ''}`,
       );
