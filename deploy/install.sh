@@ -34,10 +34,12 @@ Open Pose & Costume 一键部署脚本（Ubuntu / Debian）
   --port N                 覆盖对外端口（等价于 OPC_PORT=N）
   --docker-mirror URL      写入 /etc/docker/daemon.json 的镜像加速器
   --no-docker-install      缺少 Docker 时直接报错，不尝试自动安装
+  --no-cache               构建时禁用 Docker 缓存（代理/nginx 配置未生效时用）
   -h, --help               显示本帮助
 
 示例：
   bash deploy/install.sh
+  bash deploy/install.sh --no-cache
   bash deploy/install.sh --port 8080
   bash deploy/install.sh --offline
 EOF
@@ -47,6 +49,7 @@ OFFLINE=0
 PORT=""
 DOCKER_MIRROR=""
 ALLOW_NO_DOCKER_INSTALL=0
+NO_CACHE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -56,6 +59,7 @@ while [ $# -gt 0 ]; do
     --docker-mirror)       DOCKER_MIRROR="${2:-}"; shift ;;
     --docker-mirror=*)     DOCKER_MIRROR="${1#*=}" ;;
     --no-docker-install)   ALLOW_NO_DOCKER_INSTALL=1 ;;
+    --no-cache)            NO_CACHE=1 ;;
     -h|--help)             usage; exit 0 ;;
     *)                     die "未知参数：$1（用 --help 查看用法）" ;;
   esac
@@ -195,13 +199,17 @@ if [ "$OFFLINE" -eq 1 ]; then
   ok "镜像导入完成"
 else
   info "开始构建（首次会比较久，需要能访问 npm registry）"
-  "${COMPOSE[@]}" build
+  if [ "$NO_CACHE" -eq 1 ]; then
+    "${COMPOSE[@]}" build --no-cache web
+  else
+    "${COMPOSE[@]}" build web
+  fi
   ok "构建完成"
 fi
 
 # ---------------------------------------------------------------- 5. 启动
 log "5/7 启动服务"
-"${COMPOSE[@]}" up -d --no-build
+"${COMPOSE[@]}" up -d --force-recreate --no-build
 ok "容器已启动"
 
 # ---------------------------------------------------------------- 6. 健康检查
@@ -221,6 +229,13 @@ health_ok() {
   "${COMPOSE[@]}" exec -T web wget -q -O /dev/null http://127.0.0.1/healthz >/dev/null 2>&1
 }
 
+proxy_ok() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS --max-time 3 "http://127.0.0.1:${EFFECTIVE_PORT}/opc-proxy/ark/healthz" >/dev/null 2>&1 && return 0
+  fi
+  "${COMPOSE[@]}" exec -T web wget -q -O /dev/null http://127.0.0.1/opc-proxy/ark/healthz >/dev/null 2>&1
+}
+
 healthy=0
 for _ in $(seq 1 40); do
   if health_ok; then healthy=1; break; fi
@@ -236,6 +251,12 @@ if [ "$healthy" -ne 1 ]; then
 fi
 ok "健康检查通过"
 
+if proxy_ok; then
+  ok "火山代理路由已就绪（/opc-proxy/ark/healthz）"
+else
+  warn "未检测到 /opc-proxy/ark/healthz。若生图报 404，请执行：bash deploy/install.sh --no-cache"
+fi
+
 # ---------------------------------------------------------------- 7. 汇总
 log "7/7 部署完成"
 "${COMPOSE[@]}" ps
@@ -246,6 +267,7 @@ host_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
 printf '\n访问地址：\n'
 printf '  前端站点     http://%s:%s/\n' "$host_ip" "$EFFECTIVE_PORT"
 printf '  健康检查     http://%s:%s/healthz\n' "$host_ip" "$EFFECTIVE_PORT"
+printf '  火山代理探测 http://%s:%s/opc-proxy/ark/healthz\n' "$host_ip" "$EFFECTIVE_PORT"
 printf '  生图设置     打开站点后点击右上角齿轮，填写 Base URL / API Key / Model\n'
 printf '\n常用命令：\n'
 printf '  %s logs -f --tail=200    查看日志\n' "${COMPOSE[*]}"
